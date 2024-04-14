@@ -4,12 +4,11 @@ use std::{
     net::TcpListener,
 };
 
-const CRLF: &str = "\r\n";
+const CRLF: &str = "";
 
-const OK_RESPONSE: String = format!("HTTP/1.1 200 OK{}{}", CRLF, CRLF);
+const OK_RESPONSE: &[u8] = b"HTTP/1.1 200 OK\r\n\r\n";
 
-const NOT_FOUND_RESPONSE: String = format!("HTTP/1.1 404 Not Found{}{}", CRLF, CRLF);
-
+const NOT_FOUND_RESPONSE: &[u8] = b"HTTP/1.1 404 Not Found\r\n\r\n";
 use std::str::FromStr;
 
 #[derive(Debug, PartialEq)]
@@ -67,5 +66,5 @@ fn handle_connection(mut stream: std::net::TcpStream) {
         _ => NOT_FOUND_RESPONSE,
     };
 
-    stream.write(response.as_bytes());
+    stream.write_all(response).unwrap();
 }
