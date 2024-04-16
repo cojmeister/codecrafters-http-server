@@ -55,16 +55,26 @@ fn handle_connection(mut stream: std::net::TcpStream) {
         .take_while(|line| !line.is_empty())
         .collect();
 
+    let user_agent_header: String = http_request
+        .iter()
+        .filter(|s| s.starts_with("User-Agent:"))
+        .map(|s| s.split_whitespace().nth(1).unwrap())
+        .collect::<Vec<_>>()
+        .first()
+        .unwrap()
+        .to_string();
+
     let mut parts = http_request[0].split_whitespace();
 
     let _method: HttpMethod = HttpMethod::from_str(parts.next().unwrap()).unwrap();
     let request_endpoint = parts.next().unwrap();
-    let response = handle_request(request_endpoint);
+    let response = handle_request(request_endpoint, user_agent_header);
 
     stream.write_all(response.as_bytes()).unwrap();
 }
 
-fn handle_request(request: &str) -> String {
+fn handle_request(request: &str, user_agent_header: String) -> String {
+    println!("Header: {}", user_agent_header);
     if request.len() == 1 {
         OK_RESPONSE.to_string()
     } else if request.starts_with("/echo/") {
