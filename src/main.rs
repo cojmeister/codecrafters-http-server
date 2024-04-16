@@ -80,7 +80,7 @@ fn handle_request(request: &str, user_agent_header: String) -> String {
     } else if request.starts_with("/echo/") {
         make_response_from_string(request.trim_start_matches("/echo/"))
     } else if request.starts_with("/user-agent") {
-        user_agent_header
+        make_response_from_string(user_agent_header.as_str())
     } else {
         return NOT_FOUND_RESPONSE.to_string();
     }
