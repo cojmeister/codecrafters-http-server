@@ -4,17 +4,15 @@ use std::{
     net::TcpListener,
 };
 
-const CRLF: &str = "";
+const OK_RESPONSE: &str = "HTTP/1.1 200 OK\r\n\r\n";
 
-const OK_RESPONSE: &[u8] = b"HTTP/1.1 200 OK\r\n\r\n";
-
-const NOT_FOUND_RESPONSE: &[u8] = b"HTTP/1.1 404 Not Found\r\n\r\n";
+const NOT_FOUND_RESPONSE: &str = "HTTP/1.1 404 Not Found\r\n\r\n";
 use std::str::FromStr;
 
 #[derive(Debug, PartialEq)]
 enum HttpMethod {
-    GET,
-    POST,
+    Get,
+    Post,
 }
 
 impl FromStr for HttpMethod {
@@ -22,8 +20,8 @@ impl FromStr for HttpMethod {
 
     fn from_str(input: &str) -> Result<HttpMethod, Self::Err> {
         match input {
-            "GET" => Ok(HttpMethod::GET),
-            "POST" => Ok(HttpMethod::POST),
+            "GET" => Ok(HttpMethod::Get),
+            "POST" => Ok(HttpMethod::Post),
             _ => Err(()),
         }
     }
@@ -60,11 +58,27 @@ fn handle_connection(mut stream: std::net::TcpStream) {
     let mut parts = http_request[0].split_whitespace();
 
     let _method: HttpMethod = HttpMethod::from_str(parts.next().unwrap()).unwrap();
+    let request_endpoint = parts.next().unwrap();
+    let response = handle_request(request_endpoint);
 
-    let response = match parts.next().unwrap() {
-        "/" => OK_RESPONSE,
-        _ => NOT_FOUND_RESPONSE,
-    };
+    stream.write_all(response.as_bytes()).unwrap();
+}
 
-    stream.write_all(response).unwrap();
+fn handle_request(request: &str) -> String {
+    if request.len() == 1 {
+        OK_RESPONSE.to_string()
+    } else if request.starts_with("/echo/") {
+        make_response_from_string(request.trim_start_matches("/echo/"))
+    } else {
+        return NOT_FOUND_RESPONSE.to_string();
+    }
+}
+
+fn make_response_from_string(text_for_response: &str) -> String {
+    let base_text = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: ".to_string();
+    let content_length = text_for_response.len();
+    format!(
+        "{} {}\r\n\r\n{}",
+        base_text, content_length, text_for_response
+    )
 }
