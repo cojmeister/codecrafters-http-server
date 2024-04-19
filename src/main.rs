@@ -9,8 +9,6 @@ const OK_RESPONSE: &str = "HTTP/1.1 200 OK\r\n\r\n";
 const NOT_FOUND_RESPONSE: &str = "HTTP/1.1 404 Not Found\r\n\r\n";
 use std::str::FromStr;
 
-use http_server_starter_rust::ThreadPool;
-
 #[derive(Debug, PartialEq)]
 enum HttpMethod {
     Get,
@@ -29,19 +27,21 @@ impl FromStr for HttpMethod {
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
     println!("Logs from your program will appear here!");
 
     let listener = TcpListener::bind("127.0.0.1:4221").unwrap();
-    let pool = ThreadPool::new(6);
 
     for stream in listener.incoming() {
         match stream {
             Ok(mut _stream) => {
                 println!("accepted new connection");
 
-                pool.execute(|| handle_connection(_stream));
+                tokio::spawn(async move {
+                    handle_connection(_stream).await;
+                });
             }
             Err(e) => {
                 println!("error: {}", e);
@@ -50,7 +50,7 @@ fn main() {
     }
 }
 
-fn handle_connection(mut stream: std::net::TcpStream) {
+async fn handle_connection(mut stream: std::net::TcpStream) {
     let buf_reader = BufReader::new(&mut stream);
     let http_request: Vec<_> = buf_reader
         .lines()
