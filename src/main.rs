@@ -9,6 +9,8 @@ const OK_RESPONSE: &str = "HTTP/1.1 200 OK\r\n\r\n";
 const NOT_FOUND_RESPONSE: &str = "HTTP/1.1 404 Not Found\r\n\r\n";
 use std::str::FromStr;
 
+use http_server_starter_rust::ThreadPool;
+
 #[derive(Debug, PartialEq)]
 enum HttpMethod {
     Get,
@@ -32,13 +34,14 @@ fn main() {
     println!("Logs from your program will appear here!");
 
     let listener = TcpListener::bind("127.0.0.1:4221").unwrap();
+    let pool = ThreadPool::new(6);
 
     for stream in listener.incoming() {
         match stream {
             Ok(mut _stream) => {
                 println!("accepted new connection");
 
-                handle_connection(_stream);
+                pool.execute(|| handle_connection(_stream));
             }
             Err(e) => {
                 println!("error: {}", e);
