@@ -40,6 +40,7 @@ async fn main() {
                 println!("accepted new connection");
 
                 tokio::spawn(async move {
+                    println!("New spawn");
                     handle_connection(_stream).await;
                 });
             }
