@@ -68,7 +68,7 @@ fn handle_connection(mut stream: std::net::TcpStream) {
         .map(|s| s.split_whitespace().nth(1).unwrap())
         .collect::<Vec<_>>()
         .first()
-        .unwrap()
+        .unwrap_or(&"")
         .to_string();
 
     let mut parts = http_request[0].split_whitespace();
