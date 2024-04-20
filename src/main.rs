@@ -2,6 +2,7 @@
 use std::{
     io::{BufRead, BufReader, Write},
     net::TcpListener,
+    thread,
 };
 
 const OK_RESPONSE: &str = "HTTP/1.1 200 OK\r\n\r\n";
@@ -27,8 +28,8 @@ impl FromStr for HttpMethod {
     }
 }
 
-#[tokio::main]
-async fn main() {
+// #[tokio::main]
+fn main() {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
     println!("Logs from your program will appear here!");
 
@@ -38,11 +39,13 @@ async fn main() {
         match stream {
             Ok(mut _stream) => {
                 println!("accepted new connection");
-
-                tokio::spawn(async move {
-                    println!("New spawn");
-                    handle_connection(_stream).await;
+                thread::spawn(move || {
+                    handle_connection(_stream);
                 });
+                // tokio::spawn(async move {
+                //     println!("New spawn");
+                //     handle_connection(_stream).await;
+                // });
             }
             Err(e) => {
                 println!("error: {}", e);
@@ -51,7 +54,7 @@ async fn main() {
     }
 }
 
-async fn handle_connection(mut stream: std::net::TcpStream) {
+fn handle_connection(mut stream: std::net::TcpStream) {
     let buf_reader = BufReader::new(&mut stream);
     let http_request: Vec<_> = buf_reader
         .lines()
