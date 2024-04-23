@@ -1,13 +1,12 @@
 // Uncomment this block to pass the first stage
 use std::{env, ffi::OsString, fs, fs::DirEntry, io::{BufRead, BufReader, Write}, net::TcpListener, path::Path, sync::Arc, thread};
-use std::ops::Deref;
+use std::str::FromStr;
+
+use itertools::Itertools;
 
 const OK_RESPONSE: &str = "HTTP/1.1 200 OK\r\n\r\n";
 
 const NOT_FOUND_RESPONSE: &str = "HTTP/1.1 404 Not Found\r\n\r\n";
-use std::str::FromStr;
-
-use itertools::Itertools;
 
 #[derive(Debug, PartialEq)]
 enum HttpMethod {
@@ -33,7 +32,7 @@ fn main() {
 
     let args: Vec<String> = env::args().collect();
 
-    let files_in_server_dir = Arc::new(parse_argline_args(args));
+    let given_dir = Arc::new(parse_argline_args(args));
 
     let listener = TcpListener::bind("127.0.0.1:4221").unwrap();
 
@@ -41,9 +40,9 @@ fn main() {
         match stream {
             Ok(mut _stream) => {
                 println!("accepted new connection");
-                let files_in_server_dir = files_in_server_dir.clone();
+                let given_dir = given_dir.clone();
                 thread::spawn(move || {
-                    handle_connection(_stream, files_in_server_dir);
+                    handle_connection(_stream, given_dir);
                 });
                 // tokio::spawn(async move {
                 //     println!("New spawn");
@@ -57,11 +56,10 @@ fn main() {
     }
 }
 
-fn parse_argline_args(arline_args: Vec<String>) -> Vec<DirEntry> {
+fn parse_argline_args(argline_args: Vec<String>) -> Box<Path> {
     let mut server_directory: &Path = Path::new(".");
-    let mut files_in_server_dir: Vec<DirEntry> = vec![];
-    if arline_args.get(1).unwrap_or(&"empty".to_string()) == &("--directory".to_string()) {
-        server_directory = match arline_args.get(2) {
+    if argline_args.get(1).unwrap_or(&"empty".to_string()) == &("--directory".to_string()) {
+        server_directory = match argline_args.get(2) {
             Some(x) => Path::new(x),
             None => Path::new("."),
         };
@@ -73,16 +71,19 @@ fn parse_argline_args(arline_args: Vec<String>) -> Vec<DirEntry> {
         );
     }
     if server_directory.exists() && server_directory.is_dir() {
-        files_in_server_dir = server_directory
-            .read_dir()
-            .expect("ReadDir Failed")
-            .map(|entry| entry.expect("Failed to parse entry"))
-            .collect_vec();
+        return Box::from(server_directory)
+    } else {
+        println!("Warning, {:?} isn't a directory, or doesn't exist", server_directory);
+        return Box::from(Path::new("."))
     }
-    files_in_server_dir
 }
 
-fn handle_connection(mut stream: std::net::TcpStream, files_in_dir: Arc<Vec<DirEntry>>) {
+fn handle_connection(mut stream: std::net::TcpStream, given_dir: Arc<Box<Path>>) {
+    let files_in_dir = given_dir
+        .read_dir()
+        .expect("ReadDir Failed")
+        .map(|entry| entry.expect("Failed to parse entry"))
+        .collect_vec();
     let buf_reader = BufReader::new(&mut stream);
     let http_request: Vec<_> = buf_reader
         .lines()
@@ -101,17 +102,29 @@ fn handle_connection(mut stream: std::net::TcpStream, files_in_dir: Arc<Vec<DirE
 
     let mut parts = http_request[0].split_whitespace();
 
-    let _method: HttpMethod = HttpMethod::from_str(parts.next().unwrap()).unwrap();
+    let method: HttpMethod = HttpMethod::from_str(parts.next().unwrap()).unwrap();
     let request_endpoint = parts.next().unwrap();
-    let response = handle_request(request_endpoint, user_agent_header, files_in_dir);
+
+    let response = match method {
+        HttpMethod::Get => handle_get_request(request_endpoint, user_agent_header, files_in_dir),
+        HttpMethod::Post => handle_post_request(request_endpoint, given_dir)
+    };
 
     stream.write_all(response.as_bytes()).unwrap();
 }
 
-fn handle_request(
+fn handle_post_request(request_endpoint: &str, _given_dir: Arc<Box<Path>>) -> String {
+    if request_endpoint.starts_with("/files/") {
+        todo!()
+    } else {
+        NOT_FOUND_RESPONSE.to_string()
+    }
+}
+
+fn handle_get_request(
     request: &str,
     user_agent_header: String,
-    files_in_dir: Arc<Vec<DirEntry>>,
+    files_in_dir: Vec<DirEntry>,
 ) -> String {
     println!("Header: {}", user_agent_header);
     if request.len() == 1 {
@@ -146,7 +159,7 @@ fn make_content_stream_from_file(file_in_string: String) -> String {
     )
 }
 
-fn return_file_request(filename: OsString, files: Arc<Vec<DirEntry>>) -> String {
+fn return_file_request(filename: OsString, files: Vec<DirEntry>) -> String {
 
     if files.iter().map(|x| x.file_name()).contains(&filename) {
         let filename = files.iter().filter(|&f| f.file_name() == filename).collect::<Vec<&DirEntry>>().get(0).unwrap().to_owned();
