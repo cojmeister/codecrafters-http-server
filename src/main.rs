@@ -1,5 +1,8 @@
 // Uncomment this block to pass the first stage
 use std::{env, ffi::OsString, fs, fs::DirEntry, io::{BufRead, BufReader, Write}, net::TcpListener, path::Path, sync::Arc, thread};
+use std::fs::File;
+use std::io::Read;
+use std::net::TcpStream;
 use std::str::FromStr;
 
 use itertools::Itertools;
@@ -104,18 +107,32 @@ fn handle_connection(mut stream: std::net::TcpStream, given_dir: Arc<Box<Path>>)
 
     let method: HttpMethod = HttpMethod::from_str(parts.next().unwrap()).unwrap();
     let request_endpoint = parts.next().unwrap();
+    let content_length: usize = (&http_request
+        .iter()
+        .find(|x| x.starts_with("Content-Length: "))
+        .unwrap_or(&"Content-Length: 0".to_string())[16..]).parse().unwrap_or(0);
 
     let response = match method {
         HttpMethod::Get => handle_get_request(request_endpoint, user_agent_header, files_in_dir),
-        HttpMethod::Post => handle_post_request(request_endpoint, given_dir)
+        HttpMethod::Post => handle_post_request(request_endpoint, given_dir,content_length, BufReader::new(&mut stream))
     };
 
     stream.write_all(response.as_bytes()).unwrap();
 }
 
-fn handle_post_request(request_endpoint: &str, _given_dir: Arc<Box<Path>>) -> String {
+fn handle_post_request(request_endpoint: &str, given_dir: Arc<Box<Path>>,content_length: usize,  mut buf_reader: BufReader<&mut TcpStream>) -> String {
+
     if request_endpoint.starts_with("/files/") {
-        todo!()
+        let filename = request_endpoint.trim_start_matches("/files/");
+        let file_path = given_dir.join(Path::new(filename));
+        let mut file = File::create(file_path).expect("Unable to create file");
+
+        let mut file_buffer = vec![0; content_length];
+
+        buf_reader.read_exact(&mut file_buffer).expect("Error reading buffer");
+        file.write_all(&*file_buffer).expect("Error writing file");
+
+        "Yikes".to_string()
     } else {
         NOT_FOUND_RESPONSE.to_string()
     }
