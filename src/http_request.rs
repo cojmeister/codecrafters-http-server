@@ -43,7 +43,7 @@ impl HttpRequest {
     }
 
     fn parse_body(input: &str, body_length: usize) -> IResult<&str, &str> {
-        let (remaining, body) = complete::take_till(|b| b != '\r' && b != '\n')(input)?;
+        let (remaining, _) = complete::take_till(|b| b != '\r' && b != '\n')(input)?;
         complete::take(body_length)(remaining)
     }
 
@@ -170,7 +170,7 @@ Accept: */*
             ("Host".to_string(), "localhost:4221".to_string()),
             ("User-Agent".to_string(), "curl/8.4.0".to_string()),
         ]).into_iter().sorted().collect();
-        ;
+
         let expected_remainder = "\n";
         let (actual_remainder, actual_map) = HttpRequest::parse_headers(input).unwrap();
         assert_eq!(actual_remainder, expected_remainder);
