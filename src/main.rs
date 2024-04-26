@@ -80,30 +80,6 @@ fn handle_connection(mut stream: TcpStream, given_dir: Arc<Box<Path>>) {
         .collect::<Vec<String>>().join("\r\n").add("\r\n");
     let (_, http_request) = HttpRequest::parse_request(http_request.as_str()).unwrap();
 
-    // let http_request: Vec<_> = buf_reader
-    //     .lines()
-    //     .map(|result| result.unwrap())
-    //     .take_while(|line| !line.is_empty())
-    //     .collect();
-    //
-    // let user_agent_header: String = http_request
-    //     .iter()
-    //     .filter(|s| s.starts_with("User-Agent:"))
-    //     .map(|s| s.split_whitespace().nth(1).unwrap())
-    //     .collect::<Vec<_>>()
-    //     .first()
-    //     .unwrap_or(&"")
-    //     .to_string();
-    //
-    // let mut parts = http_request[0].split_whitespace();
-    //
-    // let method: HttpMethod = HttpMethod::from_str(parts.next().unwrap()).unwrap();
-    // let request_endpoint = parts.next().unwrap();
-    // let content_length: usize = (&http_request
-    //     .iter()
-    //     .find(|x| x.starts_with("Content-Length: "))
-    //     .unwrap_or(&"Content-Length: 0".to_string())[16..]).parse().unwrap_or(0);
-    //
     let response = match http_request.method {
         HttpMethod::Get => handle_get_request(&http_request, files_in_dir),
         HttpMethod::Post => handle_post_request(&http_request, given_dir)
