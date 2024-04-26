@@ -1,18 +1,14 @@
-mod http_request;
-
-use http_request::{HttpRequest, HttpMethod};
-
 use std::{env, ffi::OsString, fs, fs::DirEntry, io::{BufRead, BufReader, Write}, net::TcpListener, path::Path, sync::Arc, thread};
-use std::collections::HashMap;
 use std::fs::File;
-use std::io::Read;
 use std::net::TcpStream;
 use std::ops::Add;
 use std::str::FromStr;
 
-
 use itertools::Itertools;
 
+use http_request::{HttpMethod, HttpRequest};
+
+mod http_request;
 
 const OK_RESPONSE: &str = "HTTP/1.1 200 OK\r\n\r\n";
 
@@ -76,15 +72,13 @@ fn handle_connection(mut stream: TcpStream, given_dir: Arc<Box<Path>>) {
         .expect("ReadDir Failed")
         .map(|entry| entry.expect("Failed to parse entry"))
         .collect_vec();
-    let mut buf_reader = BufReader::new(&mut stream);
+    let buf_reader = BufReader::new(&mut stream);
     let http_request: String = buf_reader
         .lines()
         .map(|result| result.unwrap())
         .take_while(|line| !line.is_empty())
         .collect::<Vec<String>>().join("\r\n").add("\r\n");
     let (_, http_request) = HttpRequest::parse_request(http_request.as_str()).unwrap();
-
-    println!("{:?}", http_request);
 
     // let http_request: Vec<_> = buf_reader
     //     .lines()
@@ -112,22 +106,24 @@ fn handle_connection(mut stream: TcpStream, given_dir: Arc<Box<Path>>) {
     //
     let response = match http_request.method {
         HttpMethod::Get => handle_get_request(&http_request, files_in_dir),
-        HttpMethod::Post => handle_post_request(request_endpoint, given_dir,content_length, BufReader::new(&mut stream))
+        HttpMethod::Post => handle_post_request(&http_request, given_dir)
     };
 
     stream.write_all(response.as_bytes()).unwrap();
 }
 
-fn handle_post_request(request_endpoint: &str, given_dir: Arc<Box<Path>>,content_length: usize,  mut buf_reader: BufReader<&mut TcpStream>) -> String {
-
-    if request_endpoint.starts_with("/files/") {
-        let filename = request_endpoint.trim_start_matches("/files/");
+fn handle_post_request(http_request: &HttpRequest, given_dir: Arc<Box<Path>>) -> String {
+    if http_request.path.starts_with("/files/") {
+        let filename = http_request.path.trim_start_matches("/files/");
         let file_path = given_dir.join(Path::new(filename));
         let mut file = File::create(file_path).expect("Unable to create file");
 
-        let mut file_buffer: Vec<u8> = vec![];
+        if http_request.body.len() == 0 {
+            panic!("No body in request!")
+        }
 
-        buf_reader.read_to_end(&mut file_buffer).expect("Error reading buffer");
+        let file_buffer: Vec<u8> = http_request.body.as_str().as_bytes().to_vec();
+
         file.write_all(&*file_buffer).expect("Error writing file");
 
         "Yikes".to_string()

@@ -54,7 +54,7 @@ impl HttpRequest {
         let (remaining, _) = complete::take_till(|b| b == '\r' || b == '\n')(remaining)?;
         let (remaining, headers) = HttpRequest::parse_headers(remaining)?;
         // Optionally parse body based on content type and length
-        let mut body;
+        let body;
         if headers.contains_key("Content-Length")
             && headers["Content-Length"].parse().unwrap_or(0) > 0 {
             (_, body) = HttpRequest::parse_body(remaining, headers["Content-Length"].parse().unwrap())?;
