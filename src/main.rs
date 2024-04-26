@@ -1,33 +1,22 @@
-// Uncomment this block to pass the first stage
+mod http_request;
+
+use http_request::{HttpRequest, HttpMethod};
+
 use std::{env, ffi::OsString, fs, fs::DirEntry, io::{BufRead, BufReader, Write}, net::TcpListener, path::Path, sync::Arc, thread};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::net::TcpStream;
+use std::ops::Add;
 use std::str::FromStr;
 
+
 use itertools::Itertools;
+
 
 const OK_RESPONSE: &str = "HTTP/1.1 200 OK\r\n\r\n";
 
 const NOT_FOUND_RESPONSE: &str = "HTTP/1.1 404 Not Found\r\n\r\n";
-
-#[derive(Debug, PartialEq)]
-enum HttpMethod {
-    Get,
-    Post,
-}
-
-impl FromStr for HttpMethod {
-    type Err = ();
-
-    fn from_str(input: &str) -> Result<HttpMethod, Self::Err> {
-        match input {
-            "GET" => Ok(HttpMethod::Get),
-            "POST" => Ok(HttpMethod::Post),
-            _ => Err(()),
-        }
-    }
-}
 
 fn main() {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -81,43 +70,59 @@ fn parse_argline_args(argline_args: Vec<String>) -> Box<Path> {
     }
 }
 
-fn handle_connection(mut stream: std::net::TcpStream, given_dir: Arc<Box<Path>>) {
+fn handle_connection(mut stream: TcpStream, given_dir: Arc<Box<Path>>) {
     let files_in_dir = given_dir
         .read_dir()
         .expect("ReadDir Failed")
         .map(|entry| entry.expect("Failed to parse entry"))
         .collect_vec();
-    let buf_reader = BufReader::new(&mut stream);
-    let http_request: Vec<_> = buf_reader
+    let mut buf_reader = BufReader::new(&mut stream);
+    let http_request: String = buf_reader
         .lines()
         .map(|result| result.unwrap())
         .take_while(|line| !line.is_empty())
-        .collect();
+        .collect::<Vec<String>>().join("\r\n").add("\r\n");
+    let (_, http_request) = HttpRequest::parse_request(http_request.as_str()).unwrap();
+    // let buffer = buf_reader.read_until(b"\r\n\r\n", &mut request_string).unwrap();
+    // loop {
+    //     let mut request_line = String::new();
+    //     buf_reader.read_line(&mut request_line).unwrap();
+    //     request_string += "\r\n".to_string() + request_line;
+    // }
+    // let request = HttpRequest::parse_request(request_string.as_str()).unwrap();
 
-    let user_agent_header: String = http_request
-        .iter()
-        .filter(|s| s.starts_with("User-Agent:"))
-        .map(|s| s.split_whitespace().nth(1).unwrap())
-        .collect::<Vec<_>>()
-        .first()
-        .unwrap_or(&"")
-        .to_string();
+    println!("{:?}", http_request);
 
-    let mut parts = http_request[0].split_whitespace();
+    // let http_request: Vec<_> = buf_reader
+    //     .lines()
+    //     .map(|result| result.unwrap())
+    //     .take_while(|line| !line.is_empty())
+    //     .collect();
+    //
+    // let user_agent_header: String = http_request
+    //     .iter()
+    //     .filter(|s| s.starts_with("User-Agent:"))
+    //     .map(|s| s.split_whitespace().nth(1).unwrap())
+    //     .collect::<Vec<_>>()
+    //     .first()
+    //     .unwrap_or(&"")
+    //     .to_string();
+    //
+    // let mut parts = http_request[0].split_whitespace();
+    //
+    // let method: HttpMethod = HttpMethod::from_str(parts.next().unwrap()).unwrap();
+    // let request_endpoint = parts.next().unwrap();
+    // let content_length: usize = (&http_request
+    //     .iter()
+    //     .find(|x| x.starts_with("Content-Length: "))
+    //     .unwrap_or(&"Content-Length: 0".to_string())[16..]).parse().unwrap_or(0);
+    //
+    // let response = match method {
+    //     HttpMethod::Get => handle_get_request(request_endpoint, user_agent_header, files_in_dir),
+    //     HttpMethod::Post => handle_post_request(request_endpoint, given_dir,content_length, BufReader::new(&mut stream))
+    // };
 
-    let method: HttpMethod = HttpMethod::from_str(parts.next().unwrap()).unwrap();
-    let request_endpoint = parts.next().unwrap();
-    let content_length: usize = (&http_request
-        .iter()
-        .find(|x| x.starts_with("Content-Length: "))
-        .unwrap_or(&"Content-Length: 0".to_string())[16..]).parse().unwrap_or(0);
-
-    let response = match method {
-        HttpMethod::Get => handle_get_request(request_endpoint, user_agent_header, files_in_dir),
-        HttpMethod::Post => handle_post_request(request_endpoint, given_dir,content_length, BufReader::new(&mut stream))
-    };
-
-    stream.write_all(response.as_bytes()).unwrap();
+    // stream.write_all(response.as_bytes()).unwrap();
 }
 
 fn handle_post_request(request_endpoint: &str, given_dir: Arc<Box<Path>>,content_length: usize,  mut buf_reader: BufReader<&mut TcpStream>) -> String {
@@ -127,9 +132,9 @@ fn handle_post_request(request_endpoint: &str, given_dir: Arc<Box<Path>>,content
         let file_path = given_dir.join(Path::new(filename));
         let mut file = File::create(file_path).expect("Unable to create file");
 
-        let mut file_buffer = vec![0; content_length];
+        let mut file_buffer: Vec<u8> = vec![];
 
-        buf_reader.read_exact(&mut file_buffer).expect("Error reading buffer");
+        buf_reader.read_to_end(&mut file_buffer).expect("Error reading buffer");
         file.write_all(&*file_buffer).expect("Error writing file");
 
         "Yikes".to_string()
