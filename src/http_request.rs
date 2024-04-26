@@ -8,10 +8,10 @@ use nom::multi::{fold_many0, separated_list1};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct HttpRequest {
-    method: HttpMethod,
-    path: String,
-    headers: HashMap<String, String>,
-    body: String,
+    pub method: HttpMethod,
+    pub path: String,
+    pub headers: HashMap<String, String>,
+    pub body: String,
 }
 
 impl HttpRequest {
