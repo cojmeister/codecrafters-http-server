@@ -8,9 +8,11 @@ use itertools::Itertools;
 
 use http_request::{HttpMethod, HttpRequest};
 
-mod http_request;
+use http_response::HttpResponse;
 
-const OK_RESPONSE: &str = "HTTP/1.1 200 OK\r\n\r\n";
+mod http_request;
+mod http_response;
+
 
 const NOT_FOUND_RESPONSE: &str = "HTTP/1.1 404 Not Found\r\n\r\n";
 
@@ -104,7 +106,7 @@ fn handle_post_request(http_request: &HttpRequest, given_dir: Arc<Box<Path>>) ->
 
         "Yikes".to_string()
     } else {
-        NOT_FOUND_RESPONSE.to_string()
+        HttpResponse::make_404().to_string()
     }
 }
 
@@ -113,7 +115,7 @@ fn handle_get_request(
     files_in_dir: Vec<DirEntry>,
 ) -> String {
     if request.path.len() == 1 {
-        OK_RESPONSE.to_string()
+        HttpResponse::make_200().to_string()
     } else if request.path.starts_with("/echo/") {
         make_response_from_string(request.path.trim_start_matches("/echo/"))
     } else if request.path.starts_with("/user-agent") {
@@ -123,7 +125,7 @@ fn handle_get_request(
             .expect("Couldn't parse filename");
         return_file_request(filename, files_in_dir)
     } else {
-        return NOT_FOUND_RESPONSE.to_string();
+        return HttpResponse::make_404().to_string();
     }
 }
 
@@ -151,6 +153,6 @@ fn return_file_request(filename: OsString, files: Vec<DirEntry>) -> String {
 
         make_content_stream_from_file(fs::read_to_string(filename.path()).unwrap())
     } else {
-        NOT_FOUND_RESPONSE.to_string()
+        HttpResponse::make_404().to_string()
     }
 }
