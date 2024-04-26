@@ -83,13 +83,6 @@ fn handle_connection(mut stream: TcpStream, given_dir: Arc<Box<Path>>) {
         .take_while(|line| !line.is_empty())
         .collect::<Vec<String>>().join("\r\n").add("\r\n");
     let (_, http_request) = HttpRequest::parse_request(http_request.as_str()).unwrap();
-    // let buffer = buf_reader.read_until(b"\r\n\r\n", &mut request_string).unwrap();
-    // loop {
-    //     let mut request_line = String::new();
-    //     buf_reader.read_line(&mut request_line).unwrap();
-    //     request_string += "\r\n".to_string() + request_line;
-    // }
-    // let request = HttpRequest::parse_request(request_string.as_str()).unwrap();
 
     println!("{:?}", http_request);
 
@@ -117,12 +110,12 @@ fn handle_connection(mut stream: TcpStream, given_dir: Arc<Box<Path>>) {
     //     .find(|x| x.starts_with("Content-Length: "))
     //     .unwrap_or(&"Content-Length: 0".to_string())[16..]).parse().unwrap_or(0);
     //
-    // let response = match method {
-    //     HttpMethod::Get => handle_get_request(request_endpoint, user_agent_header, files_in_dir),
-    //     HttpMethod::Post => handle_post_request(request_endpoint, given_dir,content_length, BufReader::new(&mut stream))
-    // };
+    let response = match http_request.method {
+        HttpMethod::Get => handle_get_request(&http_request, files_in_dir),
+        HttpMethod::Post => handle_post_request(request_endpoint, given_dir,content_length, BufReader::new(&mut stream))
+    };
 
-    // stream.write_all(response.as_bytes()).unwrap();
+    stream.write_all(response.as_bytes()).unwrap();
 }
 
 fn handle_post_request(request_endpoint: &str, given_dir: Arc<Box<Path>>,content_length: usize,  mut buf_reader: BufReader<&mut TcpStream>) -> String {
@@ -144,19 +137,17 @@ fn handle_post_request(request_endpoint: &str, given_dir: Arc<Box<Path>>,content
 }
 
 fn handle_get_request(
-    request: &str,
-    user_agent_header: String,
+    request: &HttpRequest,
     files_in_dir: Vec<DirEntry>,
 ) -> String {
-    println!("Header: {}", user_agent_header);
-    if request.len() == 1 {
+    if request.path.len() == 1 {
         OK_RESPONSE.to_string()
-    } else if request.starts_with("/echo/") {
-        make_response_from_string(request.trim_start_matches("/echo/"))
-    } else if request.starts_with("/user-agent") {
-        make_response_from_string(user_agent_header.as_str())
-    } else if request.starts_with("/files/") {
-        let filename = OsString::from_str(request.trim_start_matches("/files/"))
+    } else if request.path.starts_with("/echo/") {
+        make_response_from_string(request.path.trim_start_matches("/echo/"))
+    } else if request.path.starts_with("/user-agent") {
+        make_response_from_string(request.headers["User-Agent"].as_str())
+    } else if request.path.starts_with("/files/") {
+        let filename = OsString::from_str(request.path.trim_start_matches("/files/"))
             .expect("Couldn't parse filename");
         return_file_request(filename, files_in_dir)
     } else {
