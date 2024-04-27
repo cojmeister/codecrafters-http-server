@@ -7,14 +7,12 @@ use std::str::FromStr;
 use itertools::Itertools;
 
 use http_request::{HttpMethod, HttpRequest};
-
 use http_response::HttpResponse;
+use crate::http_response::ContentType;
 
 mod http_request;
 mod http_response;
 
-
-const NOT_FOUND_RESPONSE: &str = "HTTP/1.1 404 Not Found\r\n\r\n";
 
 fn main() {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -28,16 +26,12 @@ fn main() {
 
     for stream in listener.incoming() {
         match stream {
-            Ok(mut _stream) => {
+            Ok(_stream) => {
                 println!("accepted new connection");
                 let given_dir = given_dir.clone();
                 thread::spawn(move || {
                     handle_connection(_stream, given_dir);
                 });
-                // tokio::spawn(async move {
-                //     println!("New spawn");
-                //     handle_connection(_stream).await;
-                // });
             }
             Err(e) => {
                 println!("error: {}", e);
@@ -104,7 +98,8 @@ fn handle_post_request(http_request: &HttpRequest, given_dir: Arc<Box<Path>>) ->
 
         file.write_all(&*file_buffer).expect("Error writing file");
 
-        "Yikes".to_string()
+        HttpResponse::new(201, "Created".to_string(), ContentType::None, "".to_string())
+            .to_string()
     } else {
         HttpResponse::make_404().to_string()
     }
@@ -117,9 +112,11 @@ fn handle_get_request(
     if request.path.len() == 1 {
         HttpResponse::make_200().to_string()
     } else if request.path.starts_with("/echo/") {
-        make_response_from_string(request.path.trim_start_matches("/echo/"))
+        let content = request.path.trim_start_matches("/echo/").to_string();
+        HttpResponse::new(200, "OK".to_string(), ContentType::TextPlain, content).to_string()
     } else if request.path.starts_with("/user-agent") {
-        make_response_from_string(request.headers["User-Agent"].as_str())
+        let content = request.headers["User-Agent"].clone();
+        HttpResponse::new(200, "OK".to_string(), ContentType::TextPlain, content).to_string()
     } else if request.path.starts_with("/files/") {
         let filename = OsString::from_str(request.path.trim_start_matches("/files/"))
             .expect("Couldn't parse filename");
@@ -147,11 +144,14 @@ fn make_content_stream_from_file(file_in_string: String) -> String {
 }
 
 fn return_file_request(filename: OsString, files: Vec<DirEntry>) -> String {
-
     if files.iter().map(|x| x.file_name()).contains(&filename) {
         let filename = files.iter().filter(|&f| f.file_name() == filename).collect::<Vec<&DirEntry>>().get(0).unwrap().to_owned();
-
-        make_content_stream_from_file(fs::read_to_string(filename.path()).unwrap())
+        let file_string = fs::read_to_string(filename.path()).unwrap();
+        HttpResponse::new(
+            200,
+            "OK".to_string(),
+            ContentType::ApplicationOctetStream,
+            file_string).to_string()
     } else {
         HttpResponse::make_404().to_string()
     }
