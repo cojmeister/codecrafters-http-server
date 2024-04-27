@@ -58,6 +58,8 @@ impl Display for HttpResponse {
         if self.content_length > 0 {
             base += (&format!("\r\nContent-Length: {}", self.content_length));
             base += (&format!("\r\n\r\n{}", self.content));
+        } else {
+            base += "\r\n\r\n"
         }
 
         return write!(f, "{}", base)
