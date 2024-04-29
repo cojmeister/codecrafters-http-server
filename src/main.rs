@@ -123,22 +123,6 @@ fn handle_get_request(
     }
 }
 
-fn make_response_from_string(text_for_response: &str) -> String {
-    let base_text = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: ".to_string();
-    let content_length = text_for_response.len();
-    format!(
-        "{} {}\r\n\r\n{}",
-        base_text, content_length, text_for_response
-    )
-}
-fn make_content_stream_from_file(file_in_string: String) -> String {
-    let base_text = "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: ".to_string();
-    let content_length = file_in_string.len();
-    format!(
-        "{} {}\r\n\r\n{}",
-        base_text, content_length, file_in_string
-    )
-}
 
 fn return_file_request(filename: OsString, files: Vec<DirEntry>) -> String {
     if files.iter().map(|x| x.file_name()).contains(&filename) {
