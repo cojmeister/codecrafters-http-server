@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::str::FromStr;
-use itertools::Itertools;
 
+use itertools::Itertools;
 use nom::{bytes::complete, character::complete::char, IResult};
 use nom::character::complete::crlf;
 use nom::multi::{fold_many0, separated_list1};
@@ -44,7 +44,10 @@ impl HttpRequest {
 
     fn parse_body(input: &str, body_length: usize) -> IResult<&str, &str> {
         let (remaining, _) = complete::take_till(|b| b != '\r' && b != '\n')(input)?;
-        complete::take(body_length)(remaining)
+        match complete::take::<usize, &str, nom::error::Error<&str>>(body_length)(remaining) {
+            Ok(x) => Ok(x),
+            Err(_) => Ok(("", ""))
+        }
     }
 
     pub fn parse_request(input: &str) -> IResult<&str, HttpRequest> {

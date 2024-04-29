@@ -8,6 +8,7 @@ use itertools::Itertools;
 
 use http_request::{HttpMethod, HttpRequest};
 use http_response::HttpResponse;
+
 use crate::http_response::ContentType;
 
 mod http_request;
@@ -89,10 +90,6 @@ fn handle_post_request(http_request: &HttpRequest, given_dir: Arc<Box<Path>>) ->
         let filename = http_request.path.trim_start_matches("/files/");
         let file_path = given_dir.join(Path::new(filename));
         let mut file = File::create(file_path).expect("Unable to create file");
-
-        if http_request.body.len() == 0 {
-            panic!("No body in request!")
-        }
 
         let file_buffer: Vec<u8> = http_request.body.as_str().as_bytes().to_vec();
 
