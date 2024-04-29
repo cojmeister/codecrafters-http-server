@@ -1,7 +1,7 @@
-use std::{env, ffi::OsString, fs, fs::DirEntry, io::{BufRead, BufReader, Write}, net::TcpListener, path::Path, sync::Arc, thread};
+use std::{env, ffi::OsString, fs, fs::DirEntry, io::Write, net::TcpListener, path::Path, sync::Arc, thread};
 use std::fs::File;
+use std::io::Read;
 use std::net::TcpStream;
-use std::ops::Add;
 use std::str::FromStr;
 
 use itertools::Itertools;
@@ -55,11 +55,11 @@ fn parse_argline_args(argline_args: Vec<String>) -> Box<Path> {
             server_directory.to_str().unwrap()
         );
     }
-    if server_directory.exists() && server_directory.is_dir() {
-        return Box::from(server_directory)
+    return if server_directory.exists() && server_directory.is_dir() {
+        Box::from(server_directory)
     } else {
         println!("Warning, {:?} isn't a directory, or doesn't exist", server_directory);
-        return Box::from(Path::new("."))
+        Box::from(Path::new("."))
     }
 }
 
@@ -69,13 +69,11 @@ fn handle_connection(mut stream: TcpStream, given_dir: Arc<Box<Path>>) {
         .expect("ReadDir Failed")
         .map(|entry| entry.expect("Failed to parse entry"))
         .collect_vec();
-    let buf_reader = BufReader::new(&mut stream);
-    let http_request: String = buf_reader
-        .lines()
-        .map(|result| result.unwrap())
-        .take_while(|line| !line.is_empty())
-        .collect::<Vec<String>>().join("\r\n").add("\r\n");
-    let (_, http_request) = HttpRequest::parse_request(http_request.as_str()).unwrap();
+    let mut buffer = [0; 4096]; // Buffer size might affect server in the future.
+    // Read data from the client stream into the buffer
+    stream.read(&mut buffer).unwrap();
+    let request = String::from_utf8_lossy(&buffer[..]);
+    let (_, http_request) = HttpRequest::parse_request(request.as_ref()).unwrap();
 
     let response = match http_request.method {
         HttpMethod::Get => handle_get_request(&http_request, files_in_dir),
